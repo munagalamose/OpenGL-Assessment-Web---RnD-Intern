@@ -5,6 +5,8 @@ object NativeBridge {
 
 	@JvmStatic external fun processFrame(nv21Data: ByteArray, width: Int, height: Int, mode: Int)
 
+	@JvmStatic external fun getLastGray(): ByteArray?
+
 	init {
 		System.loadLibrary("edge_native")
 	}

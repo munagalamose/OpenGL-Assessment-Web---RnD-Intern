@@ -4,15 +4,15 @@ project(edge_native)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Hint: set -DOpenCV_DIR or use local variable
-# set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../third_party/opencv/sdk/native/jni")
+# Set this to your OpenCV Android SDK native jni folder, or pass -DOpenCV_DIR
+# Example: set(OpenCV_DIR "C:/OpenCV-android-sdk/sdk/native/jni")
+# set(OpenCV_DIR "")
 
 add_library(edge_native SHARED
     src/native_bridge.cpp
     src/opencv_processor.cpp
 )
 
-# Find OpenCV if available
 find_package(OpenCV QUIET)
 if(OpenCV_FOUND)
     message(STATUS "OpenCV found: ${OpenCV_VERSION}")
@@ -22,7 +22,6 @@ else()
     message(WARNING "OpenCV not found. Configure OpenCV_DIR for build.")
 endif()
 
-# Android NDK log if needed
 if(ANDROID)
     find_library(log-lib log)
     target_link_libraries(edge_native ${log-lib})

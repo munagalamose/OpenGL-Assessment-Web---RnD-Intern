@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import android.opengl.GLSurfaceView
+import com.example.edge.camera.CameraController
+import com.example.edge.gl.FrameRenderer
 
 class MainActivity : AppCompatActivity() {
 	private lateinit var textureView: TextureView
@@ -18,11 +20,13 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var txtFps: TextView
 
 	private var mode: Int = 1 // 0 = Gray, 1 = Canny
+	private lateinit var cameraController: CameraController
+	private lateinit var renderer: FrameRenderer
 
 	private val cameraPermission = registerForActivityResult(
 		ActivityResultContracts.RequestPermission()
 	) { granted ->
-		if (granted) startCamera()
+		if (granted) startCamera() else finish()
 	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,15 +38,19 @@ class MainActivity : AppCompatActivity() {
 		btnToggle = findViewById(R.id.btnToggle)
 		txtFps = findViewById(R.id.txtFps)
 
+		renderer = FrameRenderer()
 		glSurfaceView.setEGLContextClientVersion(2)
-		glSurfaceView.setRenderer(com.example.edge.gl.Renderer())
+		glSurfaceView.setRenderer(renderer)
 		glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
-		btnToggle.setOnClickListener {
-			mode = 1 - mode
-		}
+		btnToggle.setOnClickListener { mode = 1 - mode }
 
 		ensurePermissionAndStart()
+	}
+
+	override fun onDestroy() {
+		super.onDestroy()
+		cameraController.stop()
 	}
 
 	private fun ensurePermissionAndStart() {
@@ -53,6 +61,13 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private fun startCamera() {
-		// TODO: Implement Camera2 capture to feed NV21 frames into NativeBridge.processFrame
+		cameraController = CameraController(this, textureView) { nv21, w, h ->
+			NativeBridge.processFrame(nv21, w, h, mode)
+			val gray = NativeBridge.getLastGray()
+			if (gray != null) {
+				runOnUiThread { renderer.updateFrame(gray, w, h) }
+			}
+		}
+		cameraController.start()
 	}
 }
