@@ -23,6 +23,9 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var cameraController: CameraController
 	private lateinit var renderer: FrameRenderer
 
+	private var frames = 0
+	private var lastTime = 0L
+
 	private val cameraPermission = registerForActivityResult(
 		ActivityResultContracts.RequestPermission()
 	) { granted ->
@@ -61,13 +64,28 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private fun startCamera() {
+		lastTime = System.nanoTime()
 		cameraController = CameraController(this, textureView) { nv21, w, h ->
 			NativeBridge.processFrame(nv21, w, h, mode)
 			val gray = NativeBridge.getLastGray()
 			if (gray != null) {
-				runOnUiThread { renderer.updateFrame(gray, w, h) }
+				runOnUiThread {
+					renderer.updateFrame(gray, w, h)
+					updateFps()
+				}
 			}
 		}
 		cameraController.start()
+	}
+
+	private fun updateFps() {
+		frames++
+		val now = System.nanoTime()
+		if (now - lastTime >= 1_000_000_000L) {
+			val fps = frames
+			txtFps.text = "FPS: $fps"
+			frames = 0
+			lastTime = now
+		}
 	}
 }
