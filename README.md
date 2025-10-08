@@ -1,5 +1,8 @@
 # OpenGL Edge Viewer - Android + Web
 
+![image alt](https://github.com/munagalamose/Blogging-Platform/blob/d05d40721a9fee7af725224d56d3f0c93f1cb3ae/Screenshot%202025-07-02%20211346.png)
+
+
 Real-time edge detection using OpenCV on Android with web-based frame viewer.
 
 ## 🚀 Quick Start
