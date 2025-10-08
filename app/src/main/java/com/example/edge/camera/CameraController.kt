@@ -8,10 +8,11 @@ import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.TextureView
-import java.nio.ByteBuffer
+import java.nio.BufferUnderflowException
 
 class CameraController(
 	private val context: Context,
@@ -39,8 +40,14 @@ class CameraController(
 				cameraDevice = device
 				createSession(device)
 			}
-			override fun onDisconnected(device: CameraDevice) { device.close() }
-			override fun onError(device: CameraDevice, error: Int) { device.close() }
+
+			override fun onDisconnected(device: CameraDevice) {
+				device.close()
+			}
+
+			override fun onError(device: CameraDevice, error: Int) {
+				device.close()
+			}
 		}, backgroundHandler)
 	}
 
@@ -54,7 +61,10 @@ class CameraController(
 	private fun createSession(device: CameraDevice) {
 		if (!textureView.isAvailable) {
 			textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-				override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) { createSession(device) }
+				override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
+					createSession(device)
+				}
+
 				override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {}
 				override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean = true
 				override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) {}
@@ -72,6 +82,9 @@ class CameraController(
 			try {
 				val nv21 = yuv420ToNV21(image)
 				onFrameNV21(nv21, image.width, image.height)
+			} catch (e: Exception) {
+				e.printStackTrace()
+				Log.e("CameraController", "Frame processing error: ${e.message}")
 			} finally {
 				image.close()
 			}
@@ -87,6 +100,7 @@ class CameraController(
 				}
 				session.setRepeatingRequest(request.build(), null, backgroundHandler)
 			}
+
 			override fun onConfigureFailed(session: CameraCaptureSession) {}
 		}, backgroundHandler)
 	}
@@ -98,50 +112,66 @@ class CameraController(
 
 	private fun stopBackgroundThread() {
 		backgroundThread?.quitSafely()
-		try { backgroundThread?.join() } catch (_: InterruptedException) {}
+		try {
+			backgroundThread?.join()
+		} catch (_: InterruptedException) {
+		}
 		backgroundThread = null
 		backgroundHandler = null
 	}
 
+	/**
+	 * Safely converts YUV_420_888 to NV21 without crashing.
+	 */
 	private fun yuv420ToNV21(image: Image): ByteArray {
 		val yPlane = image.planes[0]
 		val uPlane = image.planes[1]
 		val vPlane = image.planes[2]
 
 		val ySize = yPlane.buffer.remaining()
-		val uSize = uPlane.buffer.remaining()
-		val vSize = vPlane.buffer.remaining()
+		val nv21 = ByteArray(ySize + (image.width * image.height) / 2)
 
-		// NV21: Y followed by interleaved VU (i.e., V then U)
-		val nv21 = ByteArray(ySize + uSize + vSize)
+		// Copy Y plane
 		yPlane.buffer.get(nv21, 0, ySize)
 
 		val chromaRowStride = uPlane.rowStride
 		val chromaPixelStride = uPlane.pixelStride
 		val width = image.width
 		val height = image.height
-		var offset = ySize
 
 		val uBuffer = uPlane.buffer
-		uBuffer.rewind()
 		val vBuffer = vPlane.buffer
+		uBuffer.rewind()
 		vBuffer.rewind()
 
+		var offset = ySize
 		val rowCount = height / 2
 		val colCount = width / 2
 		val vRow = ByteArray(chromaRowStride)
 		val uRow = ByteArray(chromaRowStride)
-		for (row in 0 until rowCount) {
-			vBuffer.get(vRow, 0, chromaRowStride)
-			uBuffer.get(uRow, 0, chromaRowStride)
-			var col = 0
-			while (col < colCount) {
-				val vuIndex = col * chromaPixelStride
-				nv21[offset++] = vRow[vuIndex]
-				nv21[offset++] = uRow[vuIndex]
-				col++
+
+		try {
+			for (row in 0 until rowCount) {
+				val vRemaining = minOf(chromaRowStride, vBuffer.remaining())
+				val uRemaining = minOf(chromaRowStride, uBuffer.remaining())
+				vBuffer.get(vRow, 0, vRemaining)
+				uBuffer.get(uRow, 0, uRemaining)
+
+				var col = 0
+				while (col < colCount && offset + 1 < nv21.size) {
+					val vuIndex = col * chromaPixelStride
+					if (vuIndex + 1 < vRow.size && vuIndex + 1 < uRow.size) {
+						nv21[offset++] = vRow[vuIndex]
+						nv21[offset++] = uRow[vuIndex]
+					}
+					col++
+				}
 			}
+		} catch (e: BufferUnderflowException) {
+			e.printStackTrace()
+			Log.e("CameraController", "YUV buffer underflow: ${e.message}")
 		}
+
 		return nv21
 	}
 }

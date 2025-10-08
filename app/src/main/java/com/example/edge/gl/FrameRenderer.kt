@@ -19,24 +19,24 @@ class FrameRenderer : GLSurfaceView.Renderer {
 	private lateinit var texBuffer: FloatBuffer
 
 	private val vertexShader = """
-		attribute vec4 aPos;
-		attribute vec2 aTex;
-		varying vec2 vTex;
-		void main(){
-			gl_Position = aPos;
-			vTex = aTex;
-		}
-	""".trimIndent()
+        attribute vec4 aPos;
+        attribute vec2 aTex;
+        varying vec2 vTex;
+        void main(){
+            gl_Position = aPos;
+            vTex = aTex;
+        }
+    """.trimIndent()
 
 	private val fragmentShader = """
-		precision mediump float;
-		varying vec2 vTex;
-		uniform sampler2D uTex;
-		void main(){
-			float g = texture2D(uTex, vTex).r;
-			gl_FragColor = vec4(vec3(g), 1.0);
-		}
-	""".trimIndent()
+        precision mediump float;
+        varying vec2 vTex;
+        uniform sampler2D uTex;
+        void main(){
+            float g = texture2D(uTex, vTex).r;
+            gl_FragColor = vec4(vec3(g), 1.0);
+        }
+    """.trimIndent()
 
 	fun updateFrame(bytes: ByteArray, width: Int, height: Int) {
 		latestFrame = bytes
@@ -48,21 +48,32 @@ class FrameRenderer : GLSurfaceView.Renderer {
 		GLES20.glClearColor(0.07f, 0.08f, 0.10f, 1f)
 		program = buildProgram(vertexShader, fragmentShader)
 		textureId = createTexture()
+
 		val vertices = floatArrayOf(
 			-1f, -1f,
-			 1f, -1f,
+			1f, -1f,
 			-1f,  1f,
-			 1f,  1f
+			1f,  1f
 		)
+
 		val tex = floatArrayOf(
 			0f, 1f,
 			1f, 1f,
 			0f, 0f,
 			1f, 0f
 		)
-		vertexBuffer = FloatBuffer.allocate(vertices.size).put(vertices)
+
+		// ✅ Use direct buffers with native order
+		vertexBuffer = ByteBuffer.allocateDirect(vertices.size * 4)
+			.order(ByteOrder.nativeOrder())
+			.asFloatBuffer()
+			.put(vertices)
 		vertexBuffer.position(0)
-		texBuffer = FloatBuffer.allocate(tex.size).put(tex)
+
+		texBuffer = ByteBuffer.allocateDirect(tex.size * 4)
+			.order(ByteOrder.nativeOrder())
+			.asFloatBuffer()
+			.put(tex)
 		texBuffer.position(0)
 	}
 
@@ -72,20 +83,28 @@ class FrameRenderer : GLSurfaceView.Renderer {
 
 	override fun onDrawFrame(gl: GL10?) {
 		GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+
 		val frame = latestFrame
 		if (frame != null && frameWidth > 0 && frameHeight > 0) {
 			GLES20.glUseProgram(program)
 			GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
 			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
-			// Upload grayscale as RED channel (ES 3 would use GL_R8; for ES2, many devices accept GL_LUMINANCE)
+
+			// ✅ Use a direct native order ByteBuffer for the frame
+			val frameBuffer = ByteBuffer.allocateDirect(frame.size)
+				.order(ByteOrder.nativeOrder())
+				.put(frame)
+			frameBuffer.position(0)
+
 			GLES20.glTexImage2D(
 				GLES20.GL_TEXTURE_2D, 0,
 				GLES20.GL_LUMINANCE,
 				frameWidth, frameHeight, 0,
 				GLES20.GL_LUMINANCE,
 				GLES20.GL_UNSIGNED_BYTE,
-				ByteBuffer.allocateDirect(frame.size).order(ByteOrder.nativeOrder()).put(frame).apply { position(0) }
+				frameBuffer
 			)
+
 			val aPos = GLES20.glGetAttribLocation(program, "aPos")
 			val aTex = GLES20.glGetAttribLocation(program, "aTex")
 			GLES20.glEnableVertexAttribArray(aPos)

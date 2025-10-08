@@ -7,6 +7,7 @@ import android.util.Base64
 import android.view.TextureView
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -43,9 +44,7 @@ class MainActivity : AppCompatActivity() {
 		glSurfaceView = findViewById(R.id.glSurfaceView)
 		btnToggle = findViewById(R.id.btnToggle)
 		txtFps = findViewById(R.id.txtFps)
-		btnExport = Button(this).apply { text = "Export" }
-		// Simple way to place export button: reuse toggle text view container (not ideal UI, but enough for assessment)
-		// In production, place in layout XML.
+		btnExport = findViewById(R.id.btnExport)
 
 		renderer = FrameRenderer()
 		glSurfaceView.setEGLContextClientVersion(2)
@@ -130,7 +129,7 @@ class MainActivity : AppCompatActivity() {
 		try {
 			val dir = File(getExternalFilesDir(null), "export")
 			dir.mkdirs()
-			val pgm = File(dir, "frame_${System.currentTimeMillis()}.pgm")
+			val pgm = File(dir, "frame_gray.pgm")
 			pgm.outputStream().use { os ->
 				val header = "P5\n$w $h\n255\n".toByteArray()
 				os.write(header)
@@ -139,6 +138,9 @@ class MainActivity : AppCompatActivity() {
 			// Also write base64 file so web can copy/paste quickly
 			val b64 = Base64.encodeToString(gray, Base64.NO_WRAP)
 			File(dir, "frame_gray_base64.txt").writeText(b64)
-		} catch (_: Throwable) {}
+			Toast.makeText(this, "Exported to ${dir.absolutePath}", Toast.LENGTH_LONG).show()
+		} catch (e: Throwable) {
+			Toast.makeText(this, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show()
+		}
 	}
 }
