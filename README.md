@@ -1,9 +1,5 @@
 # OpenGL Edge Viewer - Android + Web
 
-![image alt](https://github.com/munagalamose/OpenGL-Assessment-Web---RnD-Intern/blob/7029a0cce6908fc82e88baa14fe2ed7b57e18604/Screenshot%20(174).png)
-
-
-
 Real-time edge detection using OpenCV on Android with web-based frame viewer.
 
 ## 🚀 Quick Start
@@ -58,8 +54,10 @@ Real-time edge detection using OpenCV on Android with web-based frame viewer.
 - OpenCV Android SDK
 - Node.js (for web viewer)
 
-## 📸 Usage
 
+![image alt](https://github.com/munagalamose/OpenGL-Assessment-Web---RnD-Intern/blob/7029a0cce6908fc82e88baa14fe2ed7b57e18604/Screenshot%20(174).png)
+
+## 📸 Usage
 1. Launch app on Android device
 2. Toggle between processing modes
 3. Tap Export to save frame
